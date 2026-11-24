@@ -1,0 +1,12 @@
+{
+  "name": "voltcalc-pro-bun",
+  "version": "2.0.0",
+  "description": "Simulasi Estimasi Tagihan & Beban Peralatan Listrik dengan Bun untuk CI/CD",
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch run server.js",
+    "start": "bun run server.js",
+    "test": "bun test --coverage",
+    "build": "bun build ./server.js --outdir ./dist --target bun"
+  }
+}

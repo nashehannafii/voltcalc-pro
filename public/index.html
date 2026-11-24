@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VoltCalc Pro — Simulasi Beban Listrik</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 text-slate-900 min-h-screen p-4 md:p-8">
+  <div class="max-w-5xl mx-auto space-y-6">
+    <!-- Header -->
+    <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white border border-slate-200 p-5 rounded-2xl">
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="text-2xl">⚡</span>
+          <h1 class="text-xl font-bold text-amber-600">VoltCalc Pro</h1>
+          <span class="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-mono">v2.0 Bun</span>
+        </div>
+        <p class="text-xs text-slate-500 mt-1">Simulator Beban Peralatan Rumah Tangga</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <select id="tariffSelect" onchange="recalculate()" class="bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm">
+          <option value="R1_900">R-1/TR 900 VA-RTM</option>
+          <option value="R1_1300" selected>R-1/TR 1.300 VA</option>
+          <option value="R1_2200">R-1/TR 2.200 VA</option>
+          <option value="R2_3500">R-2/TR 3.500 VA</option>
+        </select>
+        <div class="flex items-center gap-1.5 bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm">
+          <span class="text-slate-500 text-xs">PPJ</span>
+          <input id="ppjInput" type="number" value="3" min="0" max="20" onchange="recalculate()" class="w-10 bg-transparent text-right focus:outline-none" />
+          <span class="text-slate-500 text-xs">%</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- Kolom Kiri: Daftar Peralatan -->
+      <div class="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
+        <div class="flex items-center justify-between">
+          <h2 class="font-semibold text-slate-800">Daftar Peralatan Elektronik</h2>
+          <button onclick="addRow()" class="text-xs bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold px-3 py-1.5 rounded-lg transition">
+            + Tambah Alat
+          </button>
+        </div>
+
+        <!-- Form Tambah Cepat -->
+        <div class="grid grid-cols-12 gap-2 text-xs text-slate-500 px-2">
+          <div class="col-span-4">Nama Peralatan</div>
+          <div class="col-span-2 text-right">Daya (W)</div>
+          <div class="col-span-2 text-right">Unit</div>
+          <div class="col-span-2 text-right">Jam/Hari</div>
+          <div class="col-span-2 text-right">Aksi</div>
+        </div>
+
+        <div id="applianceList" class="space-y-2"></div>
+
+        <!-- Preset Cepat -->
+        <div class="pt-3 border-t border-slate-200 flex flex-wrap items-center gap-2 text-xs">
+          <span class="text-slate-500">Tambah Cepat:</span>
+          <button onclick="quickAdd('AC 1 PK', 800, 1, 8)" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 rounded-md">+ AC 1 PK (800W)</button>
+          <button onclick="quickAdd('Rice Cooker', 350, 1, 2)" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 rounded-md">+ Rice Cooker (350W)</button>
+          <button onclick="quickAdd('PC Kerja', 250, 1, 8)" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 rounded-md">+ PC Kerja (250W)</button>
+          <button onclick="quickAdd('Dispenser', 350, 1, 4)" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 rounded-md">+ Dispenser (350W)</button>
+        </div>
+      </div>
+
+      <!-- Kolom Kanan: Ringkasan Tagihan & Analitik -->
+      <div class="space-y-4">
+        <div class="bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
+          <h2 class="font-semibold text-slate-800">Estimasi Tagihan Bulanan</h2>
+
+          <div class="bg-slate-50 border border-slate-200 rounded-xl p-4">
+            <div class="text-xs text-slate-500">Total Estimasi Bayar</div>
+            <div id="totalCost" class="text-2xl font-bold text-amber-600 mt-1">Rp 0</div>
+            <div class="text-xs text-slate-500 mt-1">
+              Total Energi: <span id="totalKwh" class="text-slate-800 font-semibold">0 kWh</span> / bulan
+            </div>
+          </div>
+
+          <div id="overloadAlert" class="hidden p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700">
+            ⚠️ <strong>Peringatan Kapasitas:</strong> Beban puncak serentak (<span id="peakWatt">0</span> W) melebihi batas daya golongan VA yang dipilih!
+          </div>
+
+          <div class="space-y-2 text-xs border-t border-slate-200 pt-3">
+            <div class="flex justify-between text-slate-500">
+              <span>Tarif Dasar / kWh</span>
+              <span id="rateInfo" class="text-slate-800">Rp 0</span>
+            </div>
+            <div class="flex justify-between text-slate-500">
+              <span>Biaya Pemakaian</span>
+              <span id="baseCost" class="text-slate-800">Rp 0</span>
+            </div>
+            <div class="flex justify-between text-slate-500">
+              <span>Pajak PPJ</span>
+              <span id="ppjCost" class="text-slate-800">Rp 0</span>
+            </div>
+            <div class="flex justify-between text-slate-500">
+              <span>Biaya Admin</span>
+              <span id="adminFee" class="text-slate-800">Rp 0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Rincian Kontribusi Perangkat -->
+        <div class="bg-white border border-slate-200 rounded-2xl p-5 space-y-3">
+          <h3 class="text-sm font-semibold text-slate-800">Kontribusi Konsumsi Terbesar</h3>
+          <div id="breakdownBars" class="space-y-3 text-xs"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let appliances = [];
+    const formatRp = (n) => "Rp " + Math.round(n).toLocaleString("id-ID");
+
+    async function initApp() {
+      const res = await fetch("/api/init");
+      const data = await res.json();
+      appliances = data.defaultAppliances;
+      renderAppliances();
+      recalculate();
+    }
+
+    function renderAppliances() {
+      const container = document.getElementById("applianceList");
+      container.innerHTML = appliances.map((item, idx) => `
+        <div class="grid grid-cols-12 gap-2 items-center bg-slate-50 border border-slate-200 p-2 rounded-xl text-sm">
+          <input type="text" value="${item.name}" onchange="updateItem(${idx}, 'name', this.value)"
+            class="col-span-4 bg-transparent border-b border-slate-300 focus:border-amber-500 focus:outline-none px-1 py-0.5 text-xs" />
+          <input type="number" value="${item.watt}" min="0" onchange="updateItem(${idx}, 'watt', Number(this.value))"
+            class="col-span-2 bg-white border border-slate-200 rounded px-2 py-1 text-right text-xs" />
+          <input type="number" value="${item.qty}" min="1" onchange="updateItem(${idx}, 'qty', Number(this.value))"
+            class="col-span-2 bg-white border border-slate-200 rounded px-2 py-1 text-right text-xs" />
+          <input type="number" value="${item.hoursPerDay}" min="0" max="24" step="0.5" onchange="updateItem(${idx}, 'hoursPerDay', Number(this.value))"
+            class="col-span-2 bg-white border border-slate-200 rounded px-2 py-1 text-right text-xs" />
+          <div class="col-span-2 text-right">
+            <button onclick="removeItem(${idx})" class="text-red-600 hover:text-red-700 text-xs px-2 py-1">Hapus</button>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    function updateItem(index, field, value) {
+      appliances[index][field] = value;
+      recalculate();
+    }
+
+    function removeItem(index) {
+      appliances.splice(index, 1);
+      renderAppliances();
+      recalculate();
+    }
+
+    function addRow() {
+      appliances.push({ name: "Perangkat Baru", watt: 100, qty: 1, hoursPerDay: 4, daysPerMonth: 30 });
+      renderAppliances();
+      recalculate();
+    }
+
+    function quickAdd(name, watt, qty, hoursPerDay) {
+      appliances.push({ name, watt, qty, hoursPerDay, daysPerMonth: 30 });
+      renderAppliances();
+      recalculate();
+    }
+
+    async function recalculate() {
+      const tariffKey = document.getElementById("tariffSelect").value;
+      const ppjPercent = Number(document.getElementById("ppjInput").value);
+
+      const res = await fetch("/api/estimate-appliances", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ appliances, tariffKey, ppjPercent }),
+      });
+
+      const json = await res.json();
+      if (!json.success) return;
+
+      const { summary, analytics, breakdown } = json.data;
+
+      document.getElementById("totalCost").textContent = formatRp(summary.totalCost);
+      document.getElementById("totalKwh").textContent = `${summary.kwh} kWh`;
+      document.getElementById("rateInfo").textContent = formatRp(summary.ratePerKwh);
+      document.getElementById("baseCost").textContent = formatRp(summary.baseCost);
+      document.getElementById("ppjCost").textContent = formatRp(summary.ppjCost);
+      document.getElementById("adminFee").textContent = formatRp(summary.adminFee);
+
+      const alertEl = document.getElementById("overloadAlert");
+      if (analytics.isOverloadRisk) {
+        document.getElementById("peakWatt").textContent = analytics.peakSimultaneousWatt;
+        alertEl.classList.remove("hidden");
+      } else {
+        alertEl.classList.add("hidden");
+      }
+
+      document.getElementById("breakdownBars").innerHTML = breakdown.map((b) => `
+        <div>
+          <div class="flex justify-between mb-1">
+            <span class="text-slate-700 truncate max-w-[140px]">${b.name}</span>
+            <span class="text-slate-500">${b.monthlyKwh} kWh (${b.sharePercent}%)</span>
+          </div>
+          <div class="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+            <div class="bg-amber-500 h-full" style="width: ${b.sharePercent}%"></div>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    initApp();
+  </script>
+</body>
+</html>
